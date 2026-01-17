@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: repomind-postgres
+    ports:
+      - "${REPOMIND_DB_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${REPOMIND_DB_NAME:-repomind}
+      POSTGRES_USER: ${REPOMIND_DB_USER:-repomind}
+      POSTGRES_PASSWORD: ${REPOMIND_DB_PASSWORD:-repomind}
+    volumes:
+      - repomind_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${REPOMIND_DB_USER:-repomind} -d ${REPOMIND_DB_NAME:-repomind}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  embedding-server:
+    build:
+      context: ../embedding-server
+    container_name: repomind-embedding-server
+    ports:
+      - "${REPOMIND_EMBEDDINGS_PORT:-8088}:8088"
+    environment:
+      EMBEDDING_MODEL_NAME: ${REPOMIND_EMBEDDINGS_MODEL:-sentence-transformers/code-bert-tiny-code-search}
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8088/health\")'",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  repomind_pgdata:

@@ -3,7 +3,7 @@
 ## Project: REPOMIND
 
 **Target Release:** v0.1
-**Target Repo:** Apache Kafka
+**Target Repo:** Spring PetClinic
 **Theme:** Semantic Search + Context Packs for Codex/Copilot
 
 ---
@@ -14,6 +14,7 @@
 
 **Type:** Story
 **Priority:** High
+**Status:** Done
 
 **Description**
 Create a Maven multi-module project with the modules:
@@ -50,6 +51,7 @@ Create a Maven multi-module project with the modules:
 
 **Type:** Story
 **Priority:** High
+**Status:** Done
 
 **Description**
 Implement config loading from:
@@ -84,6 +86,7 @@ Implement config loading from:
 
 **Type:** Story
 **Priority:** Medium
+**Status:** Done
 
 **Description**
 Add `docker/docker-compose.yml` for local Postgres.
@@ -110,6 +113,7 @@ Add `docker/docker-compose.yml` for local Postgres.
 
 **Type:** Story
 **Priority:** High
+**Status:** Done
 
 **Description**
 Create Flyway migration to:
@@ -130,7 +134,7 @@ Create Flyway migration to:
 
 **Implementation Notes**
 
-* Keep embedding dimension configurable (default 1536)
+* Keep embedding dimension configurable (default matches model output)
 
 **Test Plan**
 
@@ -145,10 +149,144 @@ Create Flyway migration to:
 
 ---
 
+### STORY: Add Local Embeddings Server (FastAPI + SentenceTransformers) and integrate with RepoMind
+
+**ID:** STORY-EMBED-LOCAL-1
+**Epic:** EPIC-4: Embeddings Pipeline
+**Priority:** High
+**Target Release:** v0.1
+
+#### Description
+
+Implement a **local, free embeddings provider** for RepoMind by running a small **Python FastAPI server** that serves embeddings using:
+
+* `sentence-transformers/code-bert-tiny-code-search`
+
+RepoMind (Java) will call this server over HTTP to generate embeddings for:
+
+* code chunks during indexing
+* user queries during search/context generation
+
+This avoids paid API keys and keeps embeddings fully local.
+
+---
+
+#### Scope
+
+**In scope**
+
+* Add a Python service `embedding-server/` that exposes an HTTP endpoint:
+
+    * `POST /embed` → returns embeddings for a list of input strings
+* Add a Java `EmbeddingProvider` implementation that calls the local server
+* Add configuration to switch embeddings provider to `local-http`
+
+**Out of scope**
+
+* GPU optimization
+* model fine-tuning
+* production deployment on Kubernetes/ECS (local dev only in v0.1)
+
+---
+
+#### API Contract (Local Embedding Server)
+
+**Request**
+
+```json
+POST /embed
+{
+  "inputs": ["text1", "text2"]
+}
+```
+
+**Response**
+
+```json
+{
+  "embeddings": [
+    [0.01, -0.12, ...],
+    [0.03,  0.09, ...]
+  ]
+}
+```
+
+---
+
+#### Acceptance Criteria
+
+* `docker compose up -d` starts the local embedding server
+* `repomind doctor` validates the embedding server is reachable (optional but recommended)
+* `repomind index <repoPath> --repo <name>` successfully generates embeddings using local server
+* `repomind search "<query>" --repo <name>` embeds query using local server and returns results
+* No paid API keys required for embeddings
+* Embeddings are normalized (`normalize_embeddings=True`) for stable cosine similarity search
+
+---
+
+#### Implementation Notes
+
+**Python**
+
+* Create `embedding-server/embed_server.py` using:
+
+    * `fastapi`
+    * `uvicorn`
+    * `sentence-transformers`
+* Model:
+
+    * `SentenceTransformer("sentence-transformers/code-bert-tiny-code-search")`
+
+**Java**
+
+* Add config:
+
+    * `embeddings.provider = local-http`
+    * `embeddings.local_http.url = http://localhost:8088`
+* Implement:
+
+    * `LocalHttpEmbeddingProvider` (HTTP client + batching)
+
+**Ops**
+
+* Add a docker-compose service:
+
+    * `embedding-server` on port `8088`
+
+---
+
+#### Test Plan
+
+* Unit test: Java provider deserializes response correctly (mock HTTP)
+* Manual test:
+
+  ```bash
+  curl -s http://localhost:8088/embed \
+    -H "Content-Type: application/json" \
+    -d '{"inputs":["hello world","kafka leader election"]}'
+  ```
+* Integration test (optional in v0.1):
+
+    * Start embedding server + Postgres
+    * Index fixture repo
+    * Run search query and verify non-empty results
+
+---
+
+#### Deliverables
+
+* `embedding-server/embed_server.py`
+* `embedding-server/requirements.txt`
+* Docker compose update to run embedding server
+* Java `LocalHttpEmbeddingProvider`
+* Config updates in `repomind.config.yaml` and `.env.example`
+
+---
 ### REPOMIND-5 — Implement DB connectivity (HikariCP)
 
 **Type:** Story
 **Priority:** High
+**Status:** Planned
 
 **Description**
 Implement a DB factory to create a pooled datasource from env/config.
@@ -182,6 +320,7 @@ Implement a DB factory to create a pooled datasource from env/config.
 
 **Type:** Story
 **Priority:** High
+**Status:** Planned
 
 **Description**
 Implement repository methods:
@@ -219,6 +358,7 @@ Implement repository methods:
 
 **Type:** Story
 **Priority:** High
+**Status:** Planned
 
 **Description**
 Scan a repo and return list of files to index.
@@ -244,30 +384,28 @@ Scan a repo and return list of files to index.
 
 ---
 
-### REPOMIND-8 — JavaParser chunker: extract class/method chunks
+### REPOMIND-8 — File chunker: emit file-level chunks
 
 **Type:** Story
 **Priority:** High
+**Status:** Planned
 
 **Description**
-Use JavaParser to extract symbol-aware chunks:
-
-* methods as primary chunks
-* optionally class-level chunks
+Read Java files and emit one chunk per file.
 
 **Acceptance Criteria**
 
 * For a Java file:
 
-    * chunks include symbol name and line ranges
+    * chunk includes file name and line ranges
     * extracted code is non-empty
 * Chunk IDs are stable:
 
-    * `repo:file:symbol:start:end`
+    * `repo:file_path:symbol_kind:symbol:start_line:end_line`
 
 **Implementation Notes**
 
-* Prefer method chunks first (best search signal)
+* No AST parsing required for v0.1
 * Keep excerpt length bounded (config max chars)
 
 **Test Plan**
@@ -277,7 +415,7 @@ Use JavaParser to extract symbol-aware chunks:
 
 **Observability**
 
-* Log parse failures but continue indexing
+* Log file read failures but continue indexing
 
 ---
 
@@ -285,11 +423,12 @@ Use JavaParser to extract symbol-aware chunks:
 
 **Type:** Story
 **Priority:** High
+**Status:** Planned
 
 **Description**
 Implement CLI command:
 
-* `repomind index <repoPath> --repo kafka`
+* `repomind index <repoPath> --repo petclinic`
 
 **Acceptance Criteria**
 
@@ -306,7 +445,7 @@ Implement CLI command:
 
 * Build as pipeline:
 
-    * scan → parse → chunk → embed → upsert
+    * scan → chunk → embed → upsert
 
 **Test Plan**
 
@@ -320,37 +459,38 @@ Implement CLI command:
 
 # EPIC: REPOMIND-EPIC-4 — Embeddings
 
-### REPOMIND-10 — Embeddings client (OpenAI) + batching
+### REPOMIND-10 — Embeddings client (sentence-transformers) + batching
 
 **Type:** Story
 **Priority:** High
+**Status:** Planned
 
 **Description**
-Implement an embeddings client:
+Implement an embeddings client using sentence-transformers
+`code-bert-tiny-code-search` locally:
 
 * batch requests
-* retries on transient failures
-* configurable model name
+* configurable model name/path
 
 **Acceptance Criteria**
 
 * Can embed list of texts
-* Handles rate limiting (backoff)
-* Timeout is enforced
+* Loads the local model successfully
+* No network calls required for embeddings
 
 **Implementation Notes**
 
-* Keep HTTP client reusable
+* Keep model instance reusable
 * Support future provider swapping
 
 **Test Plan**
 
-* Unit tests using mocked HTTP server (no real calls)
-* Validate JSON serialization/deserialization
+* Unit tests using stub provider
+* Integration test can run against the local model if available
 
 **Observability**
 
-* Log rate-limit events and retry count
+* Log model name and load time
 
 ---
 
@@ -358,6 +498,7 @@ Implement an embeddings client:
 
 **Type:** Story
 **Priority:** High
+**Status:** Planned
 
 **Description**
 Provide a deterministic embedding provider for tests and offline runs.
@@ -378,7 +519,7 @@ Provide a deterministic embedding provider for tests and offline runs.
 
 **Observability**
 
-* Log provider selection (openai vs stub)
+* Log provider selection (sentence-transformers vs stub)
 
 ---
 
@@ -388,13 +529,14 @@ Provide a deterministic embedding provider for tests and offline runs.
 
 **Type:** Story
 **Priority:** High
+**Status:** Planned
 
 **Description**
 Search indexed chunks by semantic similarity.
 
 **Acceptance Criteria**
 
-* `repomind search "leader election" --repo kafka --limit 10`
+* `repomind search "owner address" --repo petclinic --limit 10`
 * Output includes:
 
     * rank
@@ -422,6 +564,7 @@ Search indexed chunks by semantic similarity.
 
 **Type:** Story
 **Priority:** Medium
+**Status:** Planned
 
 **Description**
 Add optional filters:
@@ -447,13 +590,14 @@ Add optional filters:
 
 **Type:** Story
 **Priority:** High
+**Status:** Planned
 
 **Description**
 Generate a markdown context pack from semantic search results.
 
 **Acceptance Criteria**
 
-* `repomind context "how does FetchRequest work?" --repo kafka --out context.md`
+* `repomind context "add visit validation" --repo petclinic --out context.md`
 * Output includes:
 
     * summary header
@@ -484,6 +628,7 @@ Generate a markdown context pack from semantic search results.
 
 **Type:** Story
 **Priority:** Medium
+**Status:** Planned
 
 **Description**
 Add final section listing top 3–5 edit targets.
@@ -504,6 +649,7 @@ Add final section listing top 3–5 edit targets.
 
 **Type:** Story
 **Priority:** Medium
+**Status:** Planned
 
 **Description**
 Support:
@@ -523,28 +669,29 @@ Support:
 
 ---
 
-# EPIC: REPOMIND-EPIC-7 — Kafka Validation & Benchmarking
+# EPIC: REPOMIND-EPIC-7 — PetClinic Validation & Benchmarking
 
-### REPOMIND-17 — Add script: clone + index Kafka + run queries
+### REPOMIND-17 — Add script: clone + index PetClinic + run queries
 
 **Type:** Story
 **Priority:** High
+**Status:** Planned
 
 **Description**
-Add a script to validate RepoMind on Kafka.
+Add a script to validate RepoMind on Spring PetClinic.
 
 **Acceptance Criteria**
 
 * Script can:
 
-    * clone kafka (if missing)
+    * clone spring-petclinic (if missing)
     * index it
     * run a fixed list of queries
     * print top results
 
 **Test Plan**
 
-* Manual run (Kafka is too large for CI by default)
+* Manual run (PetClinic is small, but keep CI optional)
 
 **Observability**
 
@@ -556,6 +703,7 @@ Add a script to validate RepoMind on Kafka.
 
 **Type:** Story
 **Priority:** Medium
+**Status:** Planned
 
 **Description**
 Create a checklist to manually verify:

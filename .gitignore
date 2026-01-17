@@ -1,0 +1,21 @@
+*.log
+.DS_Store
+.local
+
+# Maven
+**/target/
+
+# IntelliJ
+.idea/
+*.iml
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/

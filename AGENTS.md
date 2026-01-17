@@ -1,9 +1,10 @@
 # RepoMind — Agent Operating Guide (AGENTS.md)
 
-RepoMind builds semantic search + (optional) code knowledge graph for repositories and generates
+RepoMind builds semantic search and context packs for repositories and generates
 high-signal “context packs” for coding agents (Codex / Copilot CLI / Claude Code).
 
 This repo is Java-first.
+Target repo for v0.1 validation: Spring PetClinic.
 
 ---
 ## Coding guidelines
@@ -14,7 +15,6 @@ This repo is Java-first.
 
 1. Index source code into:
     - Vector index for semantic search (pgvector)
-    - Optional knowledge graph facts (call graph, endpoints, tables)
 2. Provide a CLI:
     - `repomind index ...`
     - `repomind search ...`
@@ -29,22 +29,27 @@ This repo is Java-first.
 - Full IDE replacement
 - Runtime instrumentation/profiling
 - Auto-refactoring without explicit user intent
+- Call graph extraction
+- Usages query (beyond simple grep)
+- Knowledge graph extraction
+- Incremental indexing
 
 ---
 
 ## Key Design Principles
 
-- **Symbol-aware chunking**: prefer class/method-level chunks, not arbitrary splits.
+- **File-level chunking (v0.1)**: one chunk per file, deterministic ordering.
 - **Stable identifiers**: chunks must have stable IDs for a given git commit.
 - **Safe defaults**: no destructive DB operations unless explicit flag is provided.
 - **Copy/paste output**: CLI output is meant to be pasted into agent prompts.
+- **Local embeddings**: sentence-transformers `code-bert-tiny-code-search` (no API keys).
 
 ---
 
 ## Repository Modules
 
 - `repomind-core`: domain models + query ranking + context pack generation
-- `repomind-indexer`: scanner + chunker (JavaParser for Java), emits chunks
+- `repomind-indexer`: scanner + file-level chunker, emits chunks
 - `repomind-storage`: DB access (pgvector), migrations helpers
 - `repomind-migrations`: Flyway migrations
 - `repomind-cli`: Picocli-based CLI wrapper
@@ -73,8 +78,8 @@ This repo is Java-first.
 - `./scripts/dev-up.sh`
 - `mvn -q -DskipTests=false test`
 - `java -jar repomind-cli/target/repomind.jar doctor`
-- `java -jar repomind-cli/target/repomind.jar index ../tests-fixtures/sample-repo --repo sample`
-- `java -jar repomind-cli/target/repomind.jar search "refund eligibility" --repo sample`
-- `java -jar repomind-cli/target/repomind.jar context "add negative amount validation" --repo sample --out context.md`
+- `java -jar repomind-cli/target/repomind.jar index ../spring-petclinic --repo petclinic`
+- `java -jar repomind-cli/target/repomind.jar search "owner address" --repo petclinic --limit 10`
+- `java -jar repomind-cli/target/repomind.jar context "add visit validation" --repo petclinic --out context.md`
 
 ---

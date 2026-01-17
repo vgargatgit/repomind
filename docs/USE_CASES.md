@@ -1,39 +1,39 @@
 # RepoMind Use Cases (v0.1)
 
-Target repo for analysis: Apache Kafka (open source)
+Target repo for analysis: Spring PetClinic (open source)
 
 RepoMind’s primary purpose is to provide:
-1) semantic search over the Kafka codebase
+1) semantic search over the PetClinic codebase
 2) context packs for coding agents (Codex/Copilot) so they can answer questions or propose changes with high-quality context
 
 ---
 
-## A. Semantic Search Use Cases (Kafka)
+## A. Semantic Search Use Cases (PetClinic)
 
 ### A1. Locate implementation for a concept
-- "Where is the consumer group rebalancing implemented?"
-- "Where is partition assignment strategy implemented?"
-- "Where is leader election handled?"
-- "Where is ISR (in-sync replicas) logic implemented?"
-- "Where is controller request handling implemented?"
+- "Where is owner registration handled?"
+- "Where is pet creation implemented?"
+- "Where is visit scheduling handled?"
+- "Where are vet specialties defined?"
+- "Where is the clinic service wired?"
 
 ### A2. Trace data flow by keyword intent
-- "Where does ProduceRequest get validated?"
-- "Where is FetchRequest processed?"
-- "Where are record batches serialized/deserialized?"
-- "Where are quotas enforced?"
-- "Where is request throttling applied?"
+- "Where does Owner get validated?"
+- "Where is Visit saved?"
+- "Where are pets loaded for an owner?"
+- "Where is form binding for Owner handled?"
+- "Where is PetType list provided?"
 
 ### A3. Find the 'entry point' class/method for a subsystem
-- "What is the main entrypoint for the Kafka broker startup?"
-- "Where is network I/O handling implemented?"
-- "Where is log segment rolling handled?"
-- "Where is metadata cache updated?"
+- "What is the Spring Boot entrypoint?"
+- "Where are web MVC controllers defined?"
+- "Where is visit validation handled?"
+- "Where is the owners repository implemented?"
 
 ### A4. Find configuration and defaults
-- "Where are broker configs defined?"
-- "Where are consumer configs defined?"
-- "Where is SSL/SASL config used?"
+- "Where is datasource configuration defined?"
+- "Where are application properties loaded?"
+- "Where is H2 profile configured?"
 
 ---
 
@@ -46,21 +46,21 @@ RepoMind should generate a markdown context pack that includes:
 - suggested "where to edit"
 
 Examples:
-- "Create a context pack for explaining how FetchRequest is processed end-to-end"
-- "Create a context pack for adding a log statement to request handling"
-- "Create a context pack for refactoring a method and updating tests"
+- "Create a context pack for explaining how owner registration works end-to-end"
+- "Create a context pack for adding validation to visit creation"
+- "Create a context pack for refactoring a controller and updating tests"
 
 ---
 
 ## C. System/Tooling Use Cases
 
 ### C1. Indexing
-- Index Kafka repo locally (single command)
+- Index PetClinic repo locally (single command)
 - Re-index after git pull
 - Show stats: number of files, chunks, total time
 
 ### C2. Search UX
-- `repomind search "controller election" --repo kafka`
+- `repomind search "owner address" --repo petclinic --limit 10`
 - Print results with:
     - file path
     - symbol name
@@ -68,15 +68,16 @@ Examples:
     - short snippet preview
 
 ### C3. Context generation UX
-- `repomind context "how does leader election work?" --repo kafka --out context.md`
+- `repomind context "how are visits stored?" --repo petclinic --out context.md`
 - Context pack should be under a size limit (configurable)
 
 ---
 
 ## Non-goals for v0.1
-- Full cross-module call graph resolution
-- Full dependency graph across all Maven modules
-- Graph database integration (Neo4j) — deferred to v0.2
-- Perfect semantic understanding of all Kafka internals (we optimize for retrieval quality)
+- Call graph
+- Usages query (beyond simple grep)
+- Knowledge graph
+- Incremental indexing
+- Perfect semantic understanding of all PetClinic internals (we optimize for retrieval quality)
 
 ---

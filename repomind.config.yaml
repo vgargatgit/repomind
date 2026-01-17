@@ -1,0 +1,15 @@
+# RepoMind configuration
+
+embeddings:
+  provider: local-http
+  model: sentence-transformers/code-bert-tiny-code-search
+  modelPath: ""
+  local_http:
+    url: http://localhost:8088
+
+db:
+  host: localhost
+  port: 5432
+  name: repomind
+  user: repomind
+  password: repomind
